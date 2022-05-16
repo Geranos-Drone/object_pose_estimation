@@ -2,6 +2,6 @@
 
 <launch>
 
-	 <node pkg="pifpaf_node" name="pifpaf_node" type="pifpaf_node.py" output="screen"/>
+	 <node pkg="object_pose_estimation" name="pifpaf_node" type="pifpaf_node.py" output="screen"/>
 
 </launch>
