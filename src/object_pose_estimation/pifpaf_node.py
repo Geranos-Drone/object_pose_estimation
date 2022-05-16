@@ -61,6 +61,8 @@ class PifPafNode:
         gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
         # Display the resulting frame
         cv2.imshow('frame', gray)
+        if cv2.waitKey(1) == ord('q'):
+            return False
         return True
 
 
@@ -71,33 +73,11 @@ def main():
     in_topic = 'image'
     out_topic = 'keypoints'
 
-    # recog = PifPafNode(in_topic, out_topic)
+    recog = PifPafNode(in_topic, out_topic)
     
-    # while not rospy.is_shutdown():
-    #     if not recog.display_video():
-    #         break
-
-    camera = cv2.VideoCapture(2)
-
-    if not camera.isOpened():
-            print("[pifpaf_node] Cannot open camera!")
-
-    while True:
-        # Capture frame-by-frame
-        ret, frame = camera.read()
-        # if frame is read correctly ret is True
-        if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
+    while not rospy.is_shutdown():
+        if not recog.display_video():
             break
-        # Our operations on the frame come here
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Display the resulting frame
-        cv2.imshow('frame', gray)
-        if cv2.waitKey(1) == ord('q'):
-            break
-
-    camera.release()
-    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
