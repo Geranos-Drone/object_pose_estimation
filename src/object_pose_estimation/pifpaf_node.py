@@ -1,7 +1,9 @@
 #!/usr/bin/env python
 
+from ast import While
 import rospy
 import cv2
+import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 from openpifpaf.predictor import Predictor
@@ -17,11 +19,12 @@ def _to_msg(keypoint, time):
     return msg
 
 class PifPafNode:
-    def __init__(self, in_topic, out_topic):
-        self.predictor = Predictor()
+    def __init__(self, in_topic, out_topic) -> None:
+        self.predictor = Predictor(checkpoint="resnet50")
         self.camera = cv2.VideoCapture(2) #Attention: check port nr on udoo!
         if not self.camera.isOpened():
             print("[pifpaf_node] Cannot open camera!")
+        
         self.kp_pub_0 = rospy.Publisher('PifPaf/KeyPoints/0', PointStamped, queue_size=1)
         self.kp_pub_1 = rospy.Publisher('PifPaf/KeyPoints/1', PointStamped, queue_size=1)
         self.kp_pub_2 = rospy.Publisher('PifPaf/KeyPoints/2', PointStamped, queue_size=1)
@@ -30,18 +33,25 @@ class PifPafNode:
         self.kp_pub_5 = rospy.Publisher('PifPaf/KeyPoints/5', PointStamped, queue_size=1)
         self.kp_pub_6 = rospy.Publisher('PifPaf/KeyPoints/6', PointStamped, queue_size=1)
         self.kp_pub_7 = rospy.Publisher('PifPaf/KeyPoints/7', PointStamped, queue_size=1)
+
         self.bridge = CvBridge()
 
-    def callback(self, data):
-        rgb_img = self.bridge.imgmsg_to_cv2(data, "rgb8")
-        pred, _, meta = self.predictor.numpy_image(rgb_img)
-
+    def __call__(self):
+        ret, frame = self.camera.read()
+        if not ret:
+            print("Can't receive frame (stream end?). Exiting ...")
+            return
+        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        img = np.array(img)
+        predictions, gt_anns, image_meta = self.predictor.numpy_image(img) #dtype predicitions: list
         keypoints = []
-        for p in pred:
-            kpoint = p.json_data()
-            keypoints.append(kpoint)
-
-        self.publish(keypoints)
+        if len(predictions) == 0:
+            print("Did not find any Keypoints!")
+        else:
+            for pred in predictions[0].data:
+                print(pred)
+                keypoints.append(pred)
+            self.publish(keypoints)
 
     def publish(self, keypoints):
         i = 0
@@ -51,19 +61,20 @@ class PifPafNode:
             i += 1
 
     def display_video(self):
-        # Capture frame-by-frame
-        ret, frame = self.camera.read()
-        # if frame is read correctly ret is True
-        if not ret:
-            print("Can't receive frame (stream end?). Exiting ...")
-            return False
-        # Our operations on the frame come here
-        gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Display the resulting frame
-        cv2.imshow('frame', gray)
-        if cv2.waitKey(1) == ord('q'):
-            return False
-        return True
+        ret = True
+        while ret:
+            # Capture frame-by-frame
+            ret, frame = self.camera.read()
+            # if frame is read correctly ret is True
+            if not ret:
+                print("Can't receive frame (stream end?). Exiting ...")
+            # Our operations on the frame come here
+            gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            # Display the resulting frame
+            cv2.imshow('frame', gray)
+            if cv2.waitKey(1) == ord('q'):
+                break
+        
 
 
 
@@ -73,11 +84,10 @@ def main():
     in_topic = 'image'
     out_topic = 'keypoints'
 
-    recog = PifPafNode(in_topic, out_topic)
+    PoleDetector = PifPafNode(in_topic, out_topic)
     
     while not rospy.is_shutdown():
-        if not recog.display_video():
-            break
+        PoleDetector()
 
 
 if __name__ == "__main__":
