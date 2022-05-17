@@ -10,7 +10,7 @@ from openpifpaf.predictor import Predictor
 from geometry_msgs.msg import PointStamped
 
 
-def _to_msg(keypoint, time):
+def _to_msg(keypoint, time) -> PointStamped:
     msg = PointStamped()
     msg.header.stamp = time
     msg.point.x = keypoint[0]
@@ -53,14 +53,16 @@ class PifPafNode:
                 keypoints.append(pred)
             self.publish(keypoints)
 
-    def publish(self, keypoints):
+    def publish(self, keypoints) -> None:
         i = 0
         for kp in keypoints:
-            kp_msg = _to_msg(kp)
-            getattr(self, f'kp_pub_{i}').publish(msg)
+            kp_msg = _to_msg(kp, rospy.Time(0))
+            getattr(self, f'kp_pub_{i}').publish(kp_msg)
             i += 1
+            if i == 8:
+                break
 
-    def display_video(self):
+    def display_video(self) -> None:
         ret = True
         while ret:
             # Capture frame-by-frame
@@ -68,10 +70,11 @@ class PifPafNode:
             # if frame is read correctly ret is True
             if not ret:
                 print("Can't receive frame (stream end?). Exiting ...")
+                break
             # Our operations on the frame come here
             gray = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             # Display the resulting frame
-            cv2.imshow('frame', gray)
+            cv2.imshow('gray', gray)
             if cv2.waitKey(1) == ord('q'):
                 break
         
@@ -85,6 +88,8 @@ def main():
     out_topic = 'keypoints'
 
     PoleDetector = PifPafNode(in_topic, out_topic)
+
+    PoleDetector.display_video()
     
     while not rospy.is_shutdown():
         PoleDetector()
