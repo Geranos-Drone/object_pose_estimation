@@ -19,8 +19,13 @@ class VideoNode():
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             return
+        time = rospy.Time.now()
+        height = int(frame.shape[0] / 4)
+        width = int(frame.shape[1] / 4)
+        frame = cv2.resize(frame, (width, height))
         try:
             img_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
+            img_msg.header.stamp = time
             self.image_pub.publish(img_msg)
         except Exception as e:
             print("Converting Image failed", e)
