@@ -36,7 +36,7 @@ class PifPafNode:
 
         self.bridge = CvBridge()
 
-    def __call__(self):
+    def __call__(self) -> None:
         ret, frame = self.camera.read()
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
