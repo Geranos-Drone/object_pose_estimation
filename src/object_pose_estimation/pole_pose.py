@@ -11,6 +11,8 @@ import tensorflow as tf
 from tensorflow import keras
 import imgaug.augmenters as iaa
 
+from scipy.spatial.transform import Rotation as R
+
 from geometry_msgs.msg import PointStamped
 from geometry_msgs.msg import PoseStamped
 
@@ -23,19 +25,24 @@ def kp_to_msg(keypoint, time) -> PointStamped:
     msg.header.stamp = time
     msg.point.x = keypoint[0]
     msg.point.y = keypoint[1]
-    msg.point.z = keypoint[2]
+    # msg.point.z = keypoint[2] 2D!!
     return msg
 
 def get_pose_msg(translation, rotation, time) -> PoseStamped:
     msg = PoseStamped()
     msg.header.stamp = time
+    rotation = rotation.flatten()
+    print(rotation)
+    rotation_obj = R.from_euler('xyz', rotation)
+    rotation_quat = rotation_obj.as_quat()
+    print(rotation_quat)
     msg.pose.position.x = translation[0]
     msg.pose.position.y = translation[1]
     msg.pose.position.z = translation[2]
-    msg.pose.orientation.x = rotation[0]
-    msg.pose.orientation.y = rotation[1]
-    msg.pose.orientation.z = rotation[2]
-    msg.pose.orientation.w = rotation[3]
+    msg.pose.orientation.x = rotation_quat[0]
+    msg.pose.orientation.y = rotation_quat[1]
+    msg.pose.orientation.z = rotation_quat[2]
+    msg.pose.orientation.w = rotation_quat[3]
     return msg
 
 class PolePoseNode:
@@ -54,6 +61,7 @@ class PolePoseNode:
         self.kp_pub_5 = rospy.Publisher('PolePoseNode/KeyPoints/6', PointStamped, queue_size=1)
         self.kp_pub_6 = rospy.Publisher('PolePoseNode/KeyPoints/7', PointStamped, queue_size=1)
 
+        self.keypoints = []
         self.pose_pub = rospy.Publisher('PolePoseNode/EstimatedPose', PoseStamped, queue_size=1)
 
         self.bridge = CvBridge()
@@ -82,19 +90,20 @@ class PolePoseNode:
         img = cv2.resize(img, (224,224), interpolation = cv2.INTER_LINEAR)
         img = np.expand_dims(img, axis=0)
         predictions = self.model.predict(img).reshape(-1, 7, 2) * 224
-        keypoints = []
+        self.keypoints = []
         if len(predictions) == 0:
             print("Did not find any Keypoints!")
         else:
-            for pred in predictions[0]:
-                keypoints.append(pred)
-            self.publish_kp(keypoints)
-            self.estimate_pose(keypoints)
+            print(predictions[0])
+            self.keypoints = predictions[0]
+
+            self.publish_kp(self.keypoints)
+            self.estimate_pose(self.keypoints)
 
     def estimate_pose(self, keypoints):
         success, rotation_vec, translation_vec = cv2.solvePnP(self.points_3d, keypoints, self.camera_matrix, self.dist_coeffs)
         pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
-        pose_pub.publish(translation_msg)
+        self.pose_pub.publish(pose_msg)
 
 
     def publish_kp(self, keypoints) -> None:
@@ -126,7 +135,6 @@ class PolePoseNode:
             predictions = self.model.predict(frame_data).reshape(-1, 7, 2) * 224
 
             for p in predictions[0]:
-                print(p)
                 cv2.circle( frame_res, (int(p[0]), int(p[1])), 4, (0,0,255) )
             # Display the resulting frame
 
@@ -144,7 +152,7 @@ def main():
 
     PoleDetector = PolePoseNode(in_topic, out_topic)
 
-    PoleDetector.display_keypoints()
+    #PoleDetector.display_keypoints()
     
     while not rospy.is_shutdown():
         PoleDetector()
