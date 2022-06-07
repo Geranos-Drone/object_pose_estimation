@@ -5,12 +5,13 @@ import cv2
 import numpy as np
 from cv_bridge import CvBridge
 
+
 from std_msgs.msg import String
 from sensor_msgs.msg import Image
 
 class VideoNode():
     def __init__(self):
-        self.camera = cv2.VideoCapture(2)
+        self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0")
         self.bridge = CvBridge()
         self.image_pub = rospy.Publisher("image_topic_2",Image, queue_size=1)
 
@@ -20,9 +21,9 @@ class VideoNode():
             print("Can't receive frame (stream end?). Exiting ...")
             return
         time = rospy.Time.now()
-        height = int(frame.shape[0])
-        width = int(frame.shape[1])
-        frame = cv2.resize(frame, (width, height))
+        #height = int(frame.shape[0])
+        #width = int(frame.shape[1])
+        #frame = cv2.resize(frame, (width, height))
         try:
             img_msg = self.bridge.cv2_to_imgmsg(frame, "bgr8")
             img_msg.header.stamp = time
