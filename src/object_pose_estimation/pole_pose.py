@@ -2,6 +2,7 @@
 
 from ast import While
 import rospy
+import sys
 import cv2
 import numpy as np
 from sensor_msgs.msg import Image
@@ -33,7 +34,7 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
     msg.header.stamp = time
     rotation = rotation.flatten()
     print(rotation)
-    rotation_obj = R.from_euler('xyz', rotation)
+    rotation_obj = R.from_euler('xyz', rotation)       # VERIFY THAT PNP RETURNS ROTATION AS XYZ AND NOT ZXY
     rotation_quat = rotation_obj.as_quat()
     print(rotation_quat)
     msg.pose.position.x = translation[0]
@@ -50,6 +51,9 @@ class PolePoseNode:
         network = "/home/" + USERNAME + "/BT_Vision/keras_implementation/network"
         self.model = keras.models.load_model(network)
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0") #Attention: check port nr on udoo!
+
+        cv2.namedWindow('keypoints')
+
         if not self.camera.isOpened():
             print("[PolePoseNode] Cannot open camera!")
 
@@ -75,8 +79,8 @@ class PolePoseNode:
                                 (-0.075, 0.0, -1.3),
                                 (-0.075, 0.0, -1.3),
                                 ])
-        self.camera_matrix = np.array([(347.5293999809815 * 244/640, 0.0, 314.7548267525618 * 244/640),
-                                     (0.0, 347.45033648440716 * 244/480, 247.32551331252066 * 244/480),
+        self.camera_matrix = np.array([(347.5293999809815 * 224/640, 0.0, 314.7548267525618 * 224/640),
+                                     (0.0, 347.45033648440716 * 224/480, 247.32551331252066 * 224/480),
                                      (0.0, 0.0, 1.0)])
         self.dist_coeffs = np.array([-0.06442475368146962, 0.10266027381230053, -0.16303799346444728, 0.08403964035356283])
 
@@ -86,10 +90,9 @@ class PolePoseNode:
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             return
-        img = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-        img = cv2.resize(img, (224,224), interpolation = cv2.INTER_LINEAR)
-        img = np.expand_dims(img, axis=0)
-        predictions = self.model.predict(img).reshape(-1, 7, 2) * 224
+        frame = cv2.resize(frame, (224,224), interpolation = cv2.INTER_LINEAR)
+        img_dat = np.expand_dims(frame, axis=0)
+        predictions = self.model.predict(img_dat).reshape(-1, 7, 2) * 224
         self.keypoints = []
         if len(predictions) == 0:
             print("Did not find any Keypoints!")
@@ -97,13 +100,20 @@ class PolePoseNode:
             print(predictions[0])
             self.keypoints = predictions[0]
 
-            self.publish_kp(self.keypoints)
-            self.estimate_pose(self.keypoints)
+            rotation_vec, translation_vec = self.estimate_pose(self.keypoints)
 
-    def estimate_pose(self, keypoints):
+            self.plot_pnp_comp(frame=frame, keypoints=self.keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
+            self.plot_keypoints(frame=frame, keypoints=self.keypoints)
+            self.display_img(frame)
+            self.publish_kp(self.keypoints)
+
+
+    def estimate_pose(self, keypoints) -> None:
         success, rotation_vec, translation_vec = cv2.solvePnP(self.points_3d, keypoints, self.camera_matrix, self.dist_coeffs)
         pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
         self.pose_pub.publish(pose_msg)
+
+        return rotation_vec, translation_vec
 
 
     def publish_kp(self, keypoints) -> None:
@@ -115,33 +125,26 @@ class PolePoseNode:
             if i == 7:
                 break
 
-    def display_keypoints(self) -> None:
-        ret = True
-        while ret:
-            # Capture frame-by-frame
-            ret, frame = self.camera.read()
+    def plot_keypoints(self, frame, keypoints) -> None:
+        for p in keypoints:
+            cv2.circle(frame, (int(p[0]), int(p[1])), 4, (0,0,255) )
 
-            # if frame is read correctly ret is True
-            if not ret:
-                print("Can't receive frame (stream end?). Exiting ...")
-                break
-            # Our operations on the frame come here
-            frame_res = cv2.resize(frame, (224,224), interpolation = cv2.INTER_LINEAR)
-            # try:
-            #     frame_res = np.ascontiguousarray(frame_res, dtype=np.uint8)
-            # except Exception as e: 
-            #     print("exception:", e)
-            frame_data = np.expand_dims(frame_res, axis=0) # ADDED; CONTINUE HERE AND ADD IN __call__
-            predictions = self.model.predict(frame_data).reshape(-1, 7, 2) * 224
 
-            for p in predictions[0]:
-                cv2.circle( frame_res, (int(p[0]), int(p[1])), 4, (0,0,255) )
-            # Display the resulting frame
+    def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
 
-            cv2.imshow('keypoints', frame_res)
+        bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,-1.3)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
-            if cv2.waitKey(1) == ord('q'):
-                break
+        point1 = ( int(keypoints[0][0]), int(keypoints[0][1]) )
+        point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
+
+        cv2.line(frame, point1, point2, (255,255,255), 2)
+
+    def display_img(self,frame) -> None:
+        # Display the resulting frame
+        cv2.imshow('keypoints', frame)
+        cv2.waitKey(1)
+
+
 
 
 def main():
@@ -156,6 +159,8 @@ def main():
     
     while not rospy.is_shutdown():
         PoleDetector()
+
+    cv2.destroyAllWindows()
 
 
 if __name__ == "__main__":
