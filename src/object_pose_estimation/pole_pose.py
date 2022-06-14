@@ -32,6 +32,7 @@ def kp_to_msg(keypoint, time) -> PointStamped:
 def get_pose_msg(translation, rotation, time) -> PoseStamped:
     msg = PoseStamped()
     msg.header.stamp = time
+    msg.header.frame_id = "cam"
     rotation = rotation.flatten()
     print(rotation)
     rotation_obj = R.from_euler('xyz', rotation)       # VERIFY THAT PNP RETURNS ROTATION AS XYZ AND NOT ZXY
