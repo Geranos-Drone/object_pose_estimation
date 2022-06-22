@@ -8,9 +8,12 @@ import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
 
-import tensorflow as tf
-from tensorflow import keras
-import imgaug.augmenters as iaa
+# import tensorflow as tf
+# from tensorflow import keras
+# import imgaug.augmenters as iaa
+
+import torch
+import openpifpaf
 
 from scipy.spatial.transform import Rotation as R
 
@@ -48,10 +51,11 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
 
 class PolePoseNode:
     def __init__(self, in_topic, out_topic) -> None:
-        network = "/home/" + USERNAME + "/BT_Vision/keras_implementation/network"
-        self.model = keras.models.load_model(network)
+        # network = "/home/" + USERNAME + "/BT_Vision/keras_implementation/network"
+        # self.model = keras.models.load_model(network)
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0") #Attention: check port nr on udoo!
 
+        self.predictor = openpifpaf.Predictor(checkpoint='/home/nico/BT_Vision/outputs/mobilenetv2-220611-165917-pole_detect.pkl.epoch339')
         cv2.namedWindow('keypoints')
 
         if not self.camera.isOpened():
@@ -65,7 +69,6 @@ class PolePoseNode:
         self.kp_pub_5 = rospy.Publisher('PolePoseNode/KeyPoints/6', PointStamped, queue_size=1)
         self.kp_pub_6 = rospy.Publisher('PolePoseNode/KeyPoints/7', PointStamped, queue_size=1)
 
-        self.keypoints = []
         self.pose_pub = rospy.Publisher('PolePoseNode/EstimatedPose', PoseStamped, queue_size=1)
 
         self.bridge = CvBridge()
@@ -79,8 +82,8 @@ class PolePoseNode:
                                 (-0.075, 0.0, -1.3),
                                 (-0.075, 0.0, -1.3),
                                 ])
-        self.camera_matrix = np.array([(347.5293999809815 * 224/640, 0.0, 314.7548267525618 * 224/640),
-                                     (0.0, 347.45033648440716 * 224/480, 247.32551331252066 * 224/480),
+        self.camera_matrix = np.array([(347.5293999809815, 0.0, 314.7548267525618),
+                                     (0.0, 347.45033648440716, 247.32551331252066),
                                      (0.0, 0.0, 1.0)])
         self.dist_coeffs = np.array([-0.06442475368146962, 0.10266027381230053, -0.16303799346444728, 0.08403964035356283])
 
@@ -90,35 +93,70 @@ class PolePoseNode:
         if not ret:
             print("Can't receive frame (stream end?). Exiting ...")
             return
-        frame = cv2.resize(frame, (224,224), interpolation = cv2.INTER_LINEAR)
-        img_dat = np.expand_dims(frame, axis=0)
-        predictions = self.model.predict(img_dat).reshape(-1, 7, 2) * 224
-        self.keypoints = []
+        img = np.asarray(frame)
+
+        keypoints = []
+ 
+        predictions, gt_anns, image_meta = self.predictor.numpy_image(img)
         if len(predictions) == 0:
-            print("Did not find any Keypoints!")
+            print("No Keypoints found!")
+
         else:
-            print(predictions[0])
-            self.keypoints = predictions[0]
+            print("found something: ")
+            print(predictions[0].data)
+            keypoints = predictions[0].data
 
-            rotation_vec, translation_vec = self.estimate_pose(self.keypoints)
+            success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
 
-            self.plot_pnp_comp(frame=frame, keypoints=self.keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
-            self.plot_keypoints(frame=frame, keypoints=self.keypoints)
-            self.display_img(frame)
-            self.publish_kp(self.keypoints)
+            if success:
+                self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
+
+            self.plot_keypoints(frame=frame, keypoints=keypoints)
+            self.publish_kp(keypoints)
+        self.display_img(frame)
 
 
     def estimate_pose(self, keypoints) -> None:
-        success, rotation_vec, translation_vec = cv2.solvePnP(self.points_3d, keypoints, self.camera_matrix, self.dist_coeffs)
-        pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
-        self.pose_pub.publish(pose_msg)
 
-        return rotation_vec, translation_vec
+        success = False
+        nonzero_indices = []
+        nonzero_skeleton = []
+        nonzero_keypoints = []
+
+        for i, kp in enumerate(keypoints):
+            if kp[2] > 0.01:
+                nonzero_indices.append(i)
+                nonzero_skeleton.append(self.points_3d[i])
+                nonzero_keypoints.append(kp[0:2])
+
+        nonzero_indices = np.array(nonzero_indices)
+        nonzero_skeleton = np.array(nonzero_skeleton)
+        nonzero_keypoints = np.array(nonzero_keypoints)
+        print(nonzero_skeleton)
+        print(nonzero_keypoints)
+
+        if np.shape(nonzero_keypoints)[0] > 3:
+            try:
+                success, rotation_vec, translation_vec = cv2.solvePnP(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
+                pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
+                self.pose_pub.publish(pose_msg)
+                success = True
+            except Exception as e:
+                rotation_vec = np.empty([1,3])
+                translation_vec = np.empty([1,3])
+                print("error: ", e)
+
+            return success, rotation_vec, translation_vec
+        else:
+            
+            rotation_vec = np.empty([1,3])
+            translation_vec = np.empty([1,3])
+            return success, rotation_vec, translation_vec
 
 
     def publish_kp(self, keypoints) -> None:
         i = 0
-        for kp in self.keypoints:
+        for kp in keypoints:
             kp_msg = kp_to_msg(kp, rospy.Time(0))
             getattr(self, f'kp_pub_{i}').publish(kp_msg)
             i += 1
@@ -128,16 +166,18 @@ class PolePoseNode:
     def plot_keypoints(self, frame, keypoints) -> None:
         for p in keypoints:
             cv2.circle(frame, (int(p[0]), int(p[1])), 4, (0,0,255) )
+            cv2.putText(img=frame, text=str((round(p[2],4))), org=(int(p[0]), int(p[1])+4), fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=1, color=(0, 255, 0),thickness=1)
 
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
+        if not (rotation_vec.size == 0):
+            bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,-1.3)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
-        bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,-1.3)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+            print(( int(keypoints[0][0]), int(keypoints[0][1]) ))
+            point1 = ( int(keypoints[0][0]), int(keypoints[0][1]) )
+            point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
 
-        point1 = ( int(keypoints[0][0]), int(keypoints[0][1]) )
-        point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
-
-        cv2.line(frame, point1, point2, (255,255,255), 2)
+            cv2.line(frame, point1, point2, (255,255,255), 2)
 
     def display_img(self,frame) -> None:
         # Display the resulting frame
