@@ -55,7 +55,7 @@ class PolePoseNode:
         # self.model = keras.models.load_model(network)
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0") #Attention: check port nr on udoo!
 
-        self.predictor = openpifpaf.Predictor(checkpoint='/home/nico/BT_Vision/outputs/mobilenetv2-220611-165917-pole_detect.pkl.epoch339')
+        self.predictor = openpifpaf.Predictor(checkpoint='/home/' + USERNAME + '/BT_Vision/outputs/mobilenetv2-220611-165917-pole_detect.pkl.epoch339')
         cv2.namedWindow('keypoints')
 
         if not self.camera.isOpened():
