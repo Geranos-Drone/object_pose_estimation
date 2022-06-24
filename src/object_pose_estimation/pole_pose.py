@@ -51,8 +51,6 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
 
 class PolePoseNode:
     def __init__(self, in_topic, out_topic) -> None:
-        # network = "/home/" + USERNAME + "/BT_Vision/keras_implementation/network"
-        # self.model = keras.models.load_model(network)
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0") #Attention: check port nr on udoo!
 
         self.predictor = openpifpaf.Predictor(checkpoint='/home/' + USERNAME + '/BT_Vision/outputs/mobilenetv2-220611-165917-pole_detect.pkl.epoch339')
@@ -110,7 +108,7 @@ class PolePoseNode:
 
             if success:
                 self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
-
+                
             self.plot_keypoints(frame=frame, keypoints=keypoints)
             self.publish_kp(keypoints)
         self.display_img(frame)
@@ -124,7 +122,7 @@ class PolePoseNode:
         nonzero_keypoints = []
 
         for i, kp in enumerate(keypoints):
-            if kp[2] > 0.01:
+            if kp[2] > 0.05:
                 nonzero_indices.append(i)
                 nonzero_skeleton.append(self.points_3d[i])
                 nonzero_keypoints.append(kp[0:2])
@@ -171,10 +169,10 @@ class PolePoseNode:
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
         if not (rotation_vec.size == 0):
+            top_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
             bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,-1.3)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
-            print(( int(keypoints[0][0]), int(keypoints[0][1]) ))
-            point1 = ( int(keypoints[0][0]), int(keypoints[0][1]) )
+            point1 = ( int(top_point2d[0][0][0]), int(top_point2d[0][0][1]) )
             point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
 
             cv2.line(frame, point1, point2, (255,255,255), 2)

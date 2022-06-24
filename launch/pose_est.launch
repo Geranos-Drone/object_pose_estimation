@@ -2,6 +2,6 @@
 
 <launch>
 
-	 <node pkg="object_pose_estimation" name="PolePoseNode" type="pole_pose.py" output="screen"/>
+	 <node pkg="object_pose_estimation" name="PolePoseNode" type="pole_pose.py" output="screen"/> <!-- launch-prefix="xterm -e python -m pdb" -->
 
 </launch>
