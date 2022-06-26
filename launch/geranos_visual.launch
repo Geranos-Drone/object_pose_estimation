@@ -1,0 +1,20 @@
+<?xml version="1.0"?>
+
+<launch>
+
+	 <node pkg="object_pose_estimation" name="PolePoseNode" type="pole_pose.py" output="screen"/>
+
+	<node pkg="geranos_visual_servoing" name="visual_servoing" type="geranos_visual_servoing" output="screen">
+		<rosparam file="$(find geranos_visual_servoing)/resource/visual_servoing_params.yaml"/>
+		<param name="capability_group" value="Planning" />
+	</node>
+
+	<node pkg="tf2_ros" type="static_transform_publisher" name="tf_imu_base" args="0.09 -0.1558846 0 0 0 0 1 base imu">
+		<param name="capability_group" value="TF" />
+	</node>
+
+	<node pkg="tf2_ros" type="static_transform_publisher" name="tf_imu_cam" args="0.04676 0.40905 -0.31985 -0.4792355 0.8357704 -0.1244061 -0.2373697 imu cam">
+		<param name="capability_group" value="TF" />
+	</node>
+
+</launch>
