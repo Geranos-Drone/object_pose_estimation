@@ -156,13 +156,9 @@ class PolePoseNode:
 
 
     def publish_kp(self, keypoints) -> None:
-        i = 0
-        for kp in keypoints:
+        for i, kp in enumerate(keypoints):
             kp_msg = kp_to_msg(kp, rospy.Time(0))
             getattr(self, f'kp_pub_{i}').publish(kp_msg)
-            i += 1
-            if i == 7:
-                break
 
     def plot_keypoints(self, frame, keypoints) -> None:
         for p in keypoints:
