@@ -12,6 +12,8 @@ from sensor_msgs.msg import Image
 class VideoNode():
     def __init__(self):
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0")
+        if not self.camera.isOpened():
+            print("[PolePoseNode] Cannot open camera!")
         self.bridge = CvBridge()
         self.image_pub = rospy.Publisher("image_topic_2",Image, queue_size=1)
 
