@@ -32,11 +32,13 @@ class VideoNode():
             print("Converting Image failed, error:", e)
 
 def main():
-  ROSVideo = VideoNode()
-  rospy.init_node('ros_video_node', anonymous=True)
-  while not rospy.is_shutdown():
-      ROSVideo()
-      rospy.sleep(0.01)
+    rospy.init_node('ros_video_node', anonymous=True)
+    ROSVideo = VideoNode()
+    rate = rospy.Rate(100)
+    while not rospy.is_shutdown():
+        ROSVideo()
+        rate.sleep()
+
 
 if __name__ == '__main__':
     main()
