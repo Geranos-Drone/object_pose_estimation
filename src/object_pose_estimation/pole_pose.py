@@ -60,7 +60,6 @@ class PolePoseNode:
 
 
         self.predictor = openpifpaf.Predictor(checkpoint=network)
-        cv2.namedWindow('keypoints')
 
         if not self.camera.isOpened():
             print("[PolePoseNode] Cannot open camera!")
@@ -113,9 +112,9 @@ class PolePoseNode:
             success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
 
             if success:
-                self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
+                #self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
 
-            self.plot_keypoints(frame=frame, keypoints=keypoints)
+            #self.plot_keypoints(frame=frame, keypoints=keypoints)
             self.publish_kp(keypoints)
         #self.display_img(frame)
 
