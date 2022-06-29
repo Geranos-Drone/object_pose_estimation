@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+    #!/usr/bin/env python
 
 from ast import While
 import rospy
@@ -29,7 +29,7 @@ def kp_to_msg(keypoint, time) -> PointStamped:
     msg.header.stamp = time
     msg.point.x = keypoint[0]
     msg.point.y = keypoint[1]
-    # msg.point.z = keypoint[2] 2D!!
+    msg.point.z = keypoint[2]
     return msg
 
 def get_pose_msg(translation, rotation, time) -> PoseStamped:
@@ -37,10 +37,10 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
     msg.header.stamp = time
     msg.header.frame_id = "cam"
     rotation = rotation.flatten()
-    print(rotation)
+    #print(rotation)
     rotation_obj = R.from_euler('xyz', rotation)       # VERIFY THAT PNP RETURNS ROTATION AS XYZ AND NOT ZXY
     rotation_quat = rotation_obj.as_quat()
-    print(rotation_quat)
+    #print(rotation_quat)
     msg.pose.position.x = translation[0]
     msg.pose.position.y = translation[1]
     msg.pose.position.z = translation[2]
@@ -78,18 +78,18 @@ class PolePoseNode:
         self.bridge = CvBridge()
 
         self.points_3d = np.array([
-                                (0.0, 0.0, 0.0),
-                                (-0.075, 0.0, -0.2),
-                                (0.075, 0.0, -0.2),
-                                (-0.075, 0.0, -0.7),
-                                (0.075, 0.0, -0.7),
-                                (-0.075, 0.0, -1.3),
-                                (-0.075, 0.0, -1.3),
+                                (0.0, 0.0,      1.185), # tip
+                                (0.0, -0.0625,  1.0), # top_l
+                                (0.0, 0.0625,   1.0), # top_r
+                                (0.0, -0.0625,  0.505), # mid_l
+                                (0.0, 0.0625,   0.505), # mid_r
+                                (0.0, -0.0625,  0.0), # bottom_l
+                                (0.0, 0.0625,   0.0) # bottom_r
                                 ])
-        self.camera_matrix = np.array([(347.5293999809815, 0.0, 314.7548267525618),
-                                     (0.0, 347.45033648440716, 247.32551331252066),
+        self.camera_matrix = np.array([(350.39029238592053, 0.0, 315.61588345580935),
+                                     (0.0, 350.1576972997113, 248.7907274896496),
                                      (0.0, 0.0, 1.0)])
-        self.dist_coeffs = np.array([-0.06442475368146962, 0.10266027381230053, -0.16303799346444728, 0.08403964035356283])
+        self.dist_coeffs = np.array([-0.05588267213463404, 0.06434203436364982, -0.09068050773123988, 0.04042938732850454])
 
     def __call__(self) -> None:
 
@@ -106,8 +106,8 @@ class PolePoseNode:
             print("No Keypoints found!")
 
         else:
-            print("found something: ")
-            print(predictions[0].data)
+            #print("found something: ")
+            #print(predictions[0].data)
             keypoints = predictions[0].data
 
             success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
@@ -136,8 +136,8 @@ class PolePoseNode:
         nonzero_indices = np.array(nonzero_indices)
         nonzero_skeleton = np.array(nonzero_skeleton)
         nonzero_keypoints = np.array(nonzero_keypoints)
-        print(nonzero_skeleton)
-        print(nonzero_keypoints)
+        #print(nonzero_skeleton)
+        #print(nonzero_keypoints)
 
         if np.shape(nonzero_keypoints)[0] > 3:
             try:
@@ -171,8 +171,8 @@ class PolePoseNode:
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
         if not (rotation_vec.size == 0):
-            top_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
-            bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,-1.3)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+            top_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,1.185)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+            bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
             point1 = ( int(top_point2d[0][0][0]), int(top_point2d[0][0][1]) )
             point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
