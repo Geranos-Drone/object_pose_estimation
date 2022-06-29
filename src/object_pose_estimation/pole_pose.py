@@ -117,7 +117,7 @@ class PolePoseNode:
 
             self.plot_keypoints(frame=frame, keypoints=keypoints)
             self.publish_kp(keypoints)
-        self.display_img(frame)
+        #self.display_img(frame)
 
 
     def estimate_pose(self, keypoints) -> None:
