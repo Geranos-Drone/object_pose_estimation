@@ -111,7 +111,7 @@ class PolePoseNode:
 
             success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
 
-            if success:
+            #if success:
                 #self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
 
             #self.plot_keypoints(frame=frame, keypoints=keypoints)
