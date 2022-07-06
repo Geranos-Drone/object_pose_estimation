@@ -52,9 +52,10 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
 
 class PolePoseNode:
     def __init__(self, in_topic, out_topic) -> None:
-        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220622-202035-pole_detect.pkl.epoch900"
-        # self.model = keras.models.load_model(network)
-        self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_1020CE08-video-index0") #Attention: check port nr on udoo!
+        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220705-125352-pole_detect.pkl.epoch198"
+
+        self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_1020CE08-video-index0")
+        # self.camera = cv2.VideoCapture("/home/nico/Videos/Test_Video.avi") # for debug
         if not self.camera.isOpened():
             self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0")
 
