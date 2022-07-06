@@ -1,4 +1,4 @@
-    #!/usr/bin/env python
+#!/usr/bin/env python
 
 from ast import While
 import rospy
@@ -73,8 +73,7 @@ class PolePoseNode:
         self.kp_pub_6 = rospy.Publisher('PolePoseNode/KeyPoints/7', PointStamped, queue_size=1)
 
         self.pose_pub = rospy.Publisher('PolePoseNode/EstimatedPose', PoseStamped, queue_size=1)
-
-        self.bridge = CvBridge()
+        self.image_pub = rospy.Publisher('PolePoseNode/image', Image, queue_size=1)
 
         self.points_3d = np.array([
                                 (0.0, 0.0,      1.185), # tip
@@ -111,15 +110,16 @@ class PolePoseNode:
 
             success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
 
-            #if success:
-                #self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
+            if success:
+                self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
 
-            #self.plot_keypoints(frame=frame, keypoints=keypoints)
+            self.plot_keypoints(frame=frame, keypoints=keypoints)
             self.publish_kp(keypoints)
         #self.display_img(frame)
+        self.publish_img(frame, rospy.Time.now())
 
 
-    def estimate_pose(self, keypoints) -> None:
+    def estimate_pose(self, keypoints):
 
         success = False
         nonzero_indices = []
@@ -182,6 +182,15 @@ class PolePoseNode:
         # Display the resulting frame
         cv2.imshow('keypoints', frame)
         cv2.waitKey(1)
+
+    def publish_img(self, frame, time) -> None:
+        bridge = CvBridge()
+        try:
+            img_msg = bridge.cv2_to_imgmsg(frame)
+            img_msg.header.stamp = time
+            self.image_pub.publish(img_msg)
+        except Exception as e:
+            print("Converting Image failed, error:", e)
 
 
 
