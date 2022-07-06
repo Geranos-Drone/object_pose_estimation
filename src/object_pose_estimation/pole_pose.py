@@ -14,6 +14,7 @@ import os
 # import imgaug.augmenters as iaa
 
 import torch
+import re
 import openpifpaf
 
 from scipy.spatial.transform import Rotation as R
@@ -66,6 +67,7 @@ class PolePoseNode:
         if not self.camera.isOpened():
             print("[PolePoseNode] Cannot open camera!")
 
+        self.save_images = False
         self.kp_pub_0 = rospy.Publisher('PolePoseNode/KeyPoints/1', PointStamped, queue_size=1)
         self.kp_pub_1 = rospy.Publisher('PolePoseNode/KeyPoints/2', PointStamped, queue_size=1)
         self.kp_pub_2 = rospy.Publisher('PolePoseNode/KeyPoints/3', PointStamped, queue_size=1)
@@ -78,11 +80,19 @@ class PolePoseNode:
         self.image_pub = rospy.Publisher('PolePoseNode/image', Image, queue_size=1)
 
         self.imwrite_dir = "/home/" + USERNAME + "/BT_Vision/images/" 
+
         if len(os.listdir(self.imwrite_dir)) > 0:
-            self.image_counter = max([int(s) for s in ' '.join(os.listdir(self.imwrite_dir)) if s.isdigit()]) + 1
+            max_num = 0
+            for file_name in os.listdir(self.imwrite_dir):
+
+                img_num = int(file_name.split('.')[0].split('_')[1])
+                print(img_num)
+                if img_num > max_num:
+                    max_num = img_num
+            self.image_counter = max_num + 1
             print("image counter init with ", self.image_counter)
         else:   
-            self.image_counter = 0 
+            self.image_counter = 0
 
         self.points_3d = np.array([
                                 (0.0, 0.0,      1.185), # tip
@@ -146,12 +156,12 @@ class PolePoseNode:
         nonzero_keypoints = np.array(nonzero_keypoints)
         #print(nonzero_skeleton)
         #print(nonzero_keypoints)
-        if  0 < np.shape(nonzero_keypoints)[0] < 7:
+        if  (0 < np.shape(nonzero_keypoints)[0] < 7) and self.save_images:
             filename = self.imwrite_dir + "img_" + str(self.image_counter) + ".png"
             print("saving image to: ", filename)
             cv2.imwrite(filename, frame)
             self.image_counter += 1
-        if np.shape(nonzero_keypoints)[0] > 3:
+        if np.shape(nonzero_keypoints)[0] > 6:
             try:
                 success, rotation_vec, translation_vec = cv2.solvePnP(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
                 pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
