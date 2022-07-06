@@ -7,6 +7,7 @@ import cv2
 import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import os
 
 # import tensorflow as tf
 # from tensorflow import keras
@@ -76,6 +77,13 @@ class PolePoseNode:
         self.pose_pub = rospy.Publisher('PolePoseNode/EstimatedPose', PoseStamped, queue_size=1)
         self.image_pub = rospy.Publisher('PolePoseNode/image', Image, queue_size=1)
 
+        self.imwrite_dir = "/home/" + USERNAME + "/BT_Vision/images/" 
+        if len(os.listdir(self.imwrite_dir)) > 0:
+            self.image_counter = max([int(s) for s in ' '.join(os.listdir(self.imwrite_dir)) if s.isdigit()]) + 1
+            print("image counter init with ", self.image_counter)
+        else:   
+            self.image_counter = 0 
+
         self.points_3d = np.array([
                                 (0.0, 0.0,      1.185), # tip
                                 (0.0, -0.0625,  1.0), # top_l
@@ -109,7 +117,7 @@ class PolePoseNode:
             #print(predictions[0].data)
             keypoints = predictions[0].data
 
-            success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
+            success, rotation_vec, translation_vec = self.estimate_pose(keypoints = keypoints, frame = frame)
 
             if success:
                 self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
@@ -120,7 +128,7 @@ class PolePoseNode:
         self.publish_img(frame, rospy.Time.now())
 
 
-    def estimate_pose(self, keypoints):
+    def estimate_pose(self, keypoints, frame):
 
         success = False
         nonzero_indices = []
@@ -138,7 +146,11 @@ class PolePoseNode:
         nonzero_keypoints = np.array(nonzero_keypoints)
         #print(nonzero_skeleton)
         #print(nonzero_keypoints)
-
+        if  0 < np.shape(nonzero_keypoints)[0] < 7:
+            filename = self.imwrite_dir + "img_" + str(self.image_counter) + ".png"
+            print("saving image to: ", filename)
+            cv2.imwrite(filename, frame)
+            self.image_counter += 1
         if np.shape(nonzero_keypoints)[0] > 3:
             try:
                 success, rotation_vec, translation_vec = cv2.solvePnP(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
