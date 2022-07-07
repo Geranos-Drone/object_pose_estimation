@@ -94,7 +94,7 @@ class PolePoseNode:
             print("image counter init with ", self.image_counter)
         else:   
             self.image_counter = 0
-            
+
         # self.points_3d = np.array([
         #                         (0.0, 0.0,      1.185), # tip
         #                         (0.0, -0.0625,  1.0), # top_l
@@ -106,13 +106,13 @@ class PolePoseNode:
         #                         ])
 
         self.points_3d = np.array([
-                                (0.0, 0.0,      1.185), # tip
-                                (0.0, -0.0645,  1.005), # top_l
-                                (0.0, 0.0645,   1.005), # top_r
-                                (0.0, -0.0645,  0.505), # mid_l
-                                (0.0, 0.0645,   0.505), # mid_r
-                                (0.0, -0.0645,  0.0), # bottom_l
-                                (0.0, 0.0645,   0.02) # bottom_r
+                                (0.0112, 0.0,      1.185), # tip
+                                (0.0112, -0.0635,  1.005), # top_l
+                                (0.0112, 0.0635,   1.005), # top_r
+                                (0.0112, -0.0635,  0.505), # mid_l
+                                (0.0112, 0.0635,   0.505), # mid_r
+                                (0.0112, -0.0635,  0.0), # bottom_l
+                                (0.0112, 0.0635,   0.02) # bottom_r
                                 ])
         self.camera_matrix = np.array([(350.39029238592053, 0.0, 315.61588345580935),
                                      (0.0, 350.1576972997113, 248.7907274896496),
