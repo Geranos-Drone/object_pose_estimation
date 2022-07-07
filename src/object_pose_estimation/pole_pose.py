@@ -111,8 +111,8 @@ class PolePoseNode:
                                 (0.0, 0.0645,   1.005), # top_r
                                 (0.0, -0.0645,  0.505), # mid_l
                                 (0.0, 0.0645,   0.505), # mid_r
-                                (0.0112, -0.0635,  0.0), # bottom_l
-                                (0.0112, 0.0635,   0.02) # bottom_r
+                                (0.0, -0.0645,  0.0), # bottom_l
+                                (0.0, 0.0645,   0.02) # bottom_r
                                 ])
         self.camera_matrix = np.array([(350.39029238592053, 0.0, 315.61588345580935),
                                      (0.0, 350.1576972997113, 248.7907274896496),
@@ -174,7 +174,7 @@ class PolePoseNode:
             self.image_counter += 1
         if np.shape(nonzero_keypoints)[0] > 6:
             try:
-                success, rotation_vec, translation_vec = cv2.solvePnPRansac(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
+                success, rotation_vec, translation_vec = cv2.solvePnP(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
                 pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
                 self.pose_pub.publish(pose_msg)
                 success = True
