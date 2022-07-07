@@ -54,7 +54,8 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
 
 class PolePoseNode:
     def __init__(self, in_topic, out_topic) -> None:
-        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220705-125352-pole_detect.pkl.epoch198"
+        #network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220705-125352-pole_detect.pkl.epoch198"
+        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220707-073441-pole_detect.pkl.epoch185"
 
         self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_1020CE08-video-index0")
         # self.camera = cv2.VideoCapture("/home/nico/Videos/Test_Video.avi") # for debug
@@ -193,13 +194,28 @@ class PolePoseNode:
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
         if not (rotation_vec.size == 0):
-            top_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,1.185)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
-            bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
-            point1 = ( int(top_point2d[0][0][0]), int(top_point2d[0][0][1]) )
-            point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
+            angles = [i for i in range(1, 360+1)]
+            heights = [i for i in range(1, 500+1)]
 
-            cv2.line(frame, point1, point2, (255,255,255), 2)
+            for height in heights:
+                point_z_axis , _ = cv2.projectPoints(np.array([(0.0,0.0,height * 1.185 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(point_z_axis[0][0][0]), int(point_z_axis[0][0][1])), 2, (255,255,255))
+
+
+
+            for angle in angles:
+                circle_point_2d_top, _ = cv2.projectPoints(np.array([(np.cos(np.radians(angle))*0.0625,np.sin(np.radians(angle))*0.0625,1.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                circle_point_2d_bottom, _ = cv2.projectPoints(np.array([(np.cos(np.radians(angle))*0.0625,np.sin(np.radians(angle))*0.0625,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(circle_point_2d_top[0][0][0]), int(circle_point_2d_top[0][0][1])), 2, (255,255,255))
+                cv2.circle(frame, (int(circle_point_2d_bottom[0][0][0]), int(circle_point_2d_bottom[0][0][1])), 2, (255,255,255))
+
+            for keypoint_3d in list(self.points_3d):
+                keypoint_proj , _ = cv2.projectPoints(np.array(keypoint_3d), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 3, (0,0,0))
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 2, (0,0,0))
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 1, (0,0,0))
+
 
     def display_img(self,frame) -> None:
         # Display the resulting frame
