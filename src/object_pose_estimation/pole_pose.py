@@ -7,12 +7,14 @@ import cv2
 import numpy as np
 from sensor_msgs.msg import Image
 from cv_bridge import CvBridge
+import os
 
 # import tensorflow as tf
 # from tensorflow import keras
 # import imgaug.augmenters as iaa
 
 import torch
+import re
 import openpifpaf
 
 from scipy.spatial.transform import Rotation as R
@@ -52,9 +54,11 @@ def get_pose_msg(translation, rotation, time) -> PoseStamped:
 
 class PolePoseNode:
     def __init__(self, in_topic, out_topic) -> None:
-        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220622-202035-pole_detect.pkl.epoch900"
-        # self.model = keras.models.load_model(network)
-        self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_1020CE08-video-index0") #Attention: check port nr on udoo!
+        #network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220705-125352-pole_detect.pkl.epoch198"
+        network = "/home/" + USERNAME + "/BT_Vision/outputs/" + "mobilenetv2-220707-073441-pole_detect.pkl.epoch185"
+
+        self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_1020CE08-video-index0")
+        # self.camera = cv2.VideoCapture("/home/nico/Videos/Test_Video.avi") # for debug
         if not self.camera.isOpened():
             self.camera = cv2.VideoCapture("/dev/v4l/by-id/usb-e-con_systems_See3CAM_CU55_0C10CE08-video-index0")
 
@@ -64,6 +68,7 @@ class PolePoseNode:
         if not self.camera.isOpened():
             print("[PolePoseNode] Cannot open camera!")
 
+        self.save_images = False
         self.kp_pub_0 = rospy.Publisher('PolePoseNode/KeyPoints/1', PointStamped, queue_size=1)
         self.kp_pub_1 = rospy.Publisher('PolePoseNode/KeyPoints/2', PointStamped, queue_size=1)
         self.kp_pub_2 = rospy.Publisher('PolePoseNode/KeyPoints/3', PointStamped, queue_size=1)
@@ -74,6 +79,21 @@ class PolePoseNode:
 
         self.pose_pub = rospy.Publisher('PolePoseNode/EstimatedPose', PoseStamped, queue_size=1)
         self.image_pub = rospy.Publisher('PolePoseNode/image', Image, queue_size=1)
+
+        self.imwrite_dir = "/home/" + USERNAME + "/BT_Vision/images/" 
+
+        if len(os.listdir(self.imwrite_dir)) > 0:
+            max_num = 0
+            for file_name in os.listdir(self.imwrite_dir):
+
+                img_num = int(file_name.split('.')[0].split('_')[1])
+                print(img_num)
+                if img_num > max_num:
+                    max_num = img_num
+            self.image_counter = max_num + 1
+            print("image counter init with ", self.image_counter)
+        else:   
+            self.image_counter = 0
 
         self.points_3d = np.array([
                                 (0.0, 0.0,      1.185), # tip
@@ -108,7 +128,7 @@ class PolePoseNode:
             #print(predictions[0].data)
             keypoints = predictions[0].data
 
-            success, rotation_vec, translation_vec = self.estimate_pose(keypoints)
+            success, rotation_vec, translation_vec = self.estimate_pose(keypoints = keypoints, frame = frame)
 
             if success:
                 self.plot_pnp_comp(frame=frame, keypoints=keypoints, rotation_vec=rotation_vec, translation_vec=translation_vec)
@@ -119,7 +139,7 @@ class PolePoseNode:
         self.publish_img(frame, rospy.Time.now())
 
 
-    def estimate_pose(self, keypoints):
+    def estimate_pose(self, keypoints, frame):
 
         success = False
         nonzero_indices = []
@@ -137,8 +157,12 @@ class PolePoseNode:
         nonzero_keypoints = np.array(nonzero_keypoints)
         #print(nonzero_skeleton)
         #print(nonzero_keypoints)
-
-        if np.shape(nonzero_keypoints)[0] > 3:
+        if  (0 < np.shape(nonzero_keypoints)[0] < 7) and self.save_images:
+            filename = self.imwrite_dir + "img_" + str(self.image_counter) + ".png"
+            print("saving image to: ", filename)
+            cv2.imwrite(filename, frame)
+            self.image_counter += 1
+        if np.shape(nonzero_keypoints)[0] > 6:
             try:
                 success, rotation_vec, translation_vec = cv2.solvePnP(nonzero_skeleton, nonzero_keypoints, self.camera_matrix, self.dist_coeffs)
                 pose_msg = get_pose_msg(translation_vec, rotation_vec, rospy.Time(0))
@@ -170,13 +194,28 @@ class PolePoseNode:
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
         if not (rotation_vec.size == 0):
-            top_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,1.185)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
-            bottom_point2d, jacobian = cv2.projectPoints(np.array([(0.0,0.0,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
 
-            point1 = ( int(top_point2d[0][0][0]), int(top_point2d[0][0][1]) )
-            point2 = ( int(bottom_point2d[0][0][0]), int(bottom_point2d[0][0][1]) )
+            angles = [i for i in range(1, 360+1)]
+            heights = [i for i in range(1, 500+1)]
 
-            cv2.line(frame, point1, point2, (255,255,255), 2)
+            for height in heights:
+                point_z_axis , _ = cv2.projectPoints(np.array([(0.0,0.0,height * 1.185 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(point_z_axis[0][0][0]), int(point_z_axis[0][0][1])), 2, (255,255,255))
+
+
+
+            for angle in angles:
+                circle_point_2d_top, _ = cv2.projectPoints(np.array([(np.cos(np.radians(angle))*0.0625,np.sin(np.radians(angle))*0.0625,1.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                circle_point_2d_bottom, _ = cv2.projectPoints(np.array([(np.cos(np.radians(angle))*0.0625,np.sin(np.radians(angle))*0.0625,0.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(circle_point_2d_top[0][0][0]), int(circle_point_2d_top[0][0][1])), 2, (255,255,255))
+                cv2.circle(frame, (int(circle_point_2d_bottom[0][0][0]), int(circle_point_2d_bottom[0][0][1])), 2, (255,255,255))
+
+            for keypoint_3d in list(self.points_3d):
+                keypoint_proj , _ = cv2.projectPoints(np.array(keypoint_3d), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 3, (0,0,0))
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 2, (0,0,0))
+                cv2.circle(frame, (int(keypoint_proj[0][0][0]), int(keypoint_proj[0][0][1])), 1, (0,0,0))
+
 
     def display_img(self,frame) -> None:
         # Display the resulting frame
