@@ -209,10 +209,13 @@ class PolePoseNode:
             heights = [i for i in range(1, 500+1)]
 
             for height in heights:
-                point_left_edge , _ = cv2.projectPoints(np.array([(0.0,-0.0625,height * 1.185 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
-                point_right_edge , _ = cv2.projectPoints(np.array([(0.0,0.0625,height * 1.185 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                point_left_edge , _ = cv2.projectPoints(np.array([(0.0,-0.0625,height * 1.0 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+                point_right_edge , _ = cv2.projectPoints(np.array([(0.0,0.0625,height * 1.0 / 500)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
                 cv2.circle(frame, (int(point_left_edge[0][0][0]), int(point_left_edge[0][0][1])), 2, (255,255,255))
                 cv2.circle(frame, (int(point_right_edge[0][0][0]), int(point_right_edge[0][0][1])), 2, (255,255,255))
+
+            point_tip , _ = cv2.projectPoints(np.array([(0.0,0.0,1.185)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
+            cv2.circle(frame, (int(point_tip[0][0][0]), int(point_tip[0][0][1])), 2, (255,255,255))
 
 
 
