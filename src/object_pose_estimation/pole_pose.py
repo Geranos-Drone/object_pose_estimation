@@ -199,7 +199,7 @@ class PolePoseNode:
     def plot_keypoints(self, frame, keypoints) -> None:
         for p in keypoints:
             cv2.circle(frame, (int(p[0]), int(p[1])), 4, (0,0,255) )
-            cv2.putText(img=frame, text=str((round(p[2],4))), org=(int(p[0]), int(p[1])+4), fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=1, color=(0, 255, 0),thickness=1)
+            # cv2.putText(img=frame, text=str((round(p[2],4))), org=(int(p[0]), int(p[1])+4), fontFace=cv2.FONT_HERSHEY_COMPLEX_SMALL, fontScale=1, color=(0, 255, 0),thickness=1)
 
 
     def plot_pnp_comp(self, frame, keypoints, rotation_vec, translation_vec) -> None:
@@ -216,8 +216,6 @@ class PolePoseNode:
 
             point_tip , _ = cv2.projectPoints(np.array([(0.0,0.0,1.185)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
             cv2.circle(frame, (int(point_tip[0][0][0]), int(point_tip[0][0][1])), 2, (255,255,255))
-
-
 
             for angle in angles:
                 circle_point_2d_top, _ = cv2.projectPoints(np.array([(np.cos(np.radians(angle))*0.0625,np.sin(np.radians(angle))*0.0625,1.0)]), rotation_vec, translation_vec, self.camera_matrix, self.dist_coeffs)
